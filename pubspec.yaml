@@ -40,6 +40,7 @@ dependencies:
   # WebAudio clock on web (sample-exact scheduling; see engine/web_audio_clock).
   web: ^1.1.1
   wakelock_plus: ^1.6.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

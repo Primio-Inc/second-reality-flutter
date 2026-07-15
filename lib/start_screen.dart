@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'engine/external_link.dart';
 
 
 /// The landing screen.
@@ -196,7 +197,27 @@ class _StartScreenState extends State<StartScreen>
                   text: 'Second Reality is widely considered the greatest and '
                       'most influential demo in the history of the demoscene. '),
             const TextSpan(text: 'Thirty-three years on, the people behind '),
-            const TextSpan(text: 'primio.dev', style: TextStyle(color: _amber)),
+            // A real link, opening primio.dev in a new tab. It CANNOT be a
+            // TapGestureRecognizer on a TextSpan: this paragraph lives inside a
+            // SelectionArea, whose selection gestures win the arena, so the
+            // recognizer silently never fires (the trap this file already
+            // documents for the START button). So the link is a WidgetSpan
+            // wrapped in SelectionContainer.disabled — that pulls it OUT of the
+            // selection so its own tap wins. It is therefore the one word here
+            // that is not selectable, which is the right trade for a clickable
+            // link. (Confirmed workaround for flutter/flutter#141151.)
+            WidgetSpan(
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              child: SelectionContainer.disabled(
+                child: _Link(
+                  label: 'primio.dev',
+                  url: 'https://primio.dev',
+                  style: const TextStyle(
+                      color: _amber, fontSize: 15, height: 1.6, letterSpacing: .1),
+                ),
+              ),
+            ),
             const TextSpan(
               text: ', the Flutter-based AI app builder, bring it to '
                   'Flutter. A port, and an upgrade: the original code and '
@@ -207,6 +228,42 @@ class _StartScreenState extends State<StartScreen>
           ],
         ),
       );
+}
+
+/// An inline text link to an external site, opened in a new tab on web (or the
+/// system browser on native).
+///
+/// The tap is handled by [buildExternalLink], which on web overlays a REAL
+/// `<a target="_blank">` DOM element on the painted text so the BROWSER owns the
+/// click. That is the only thing that works in the --wasm release build here:
+/// a Flutter onTap loses the surrounding SelectionArea's gesture arena
+/// (flutter/flutter#141151), launchUrl from a pointer callback is popup-blocked,
+/// and url_launcher's Link builds its anchor through the semantics tree, which is
+/// off in release — so no anchor existed at all (verified: 0 `<a>` in the DOM).
+/// The real anchor also gives the native right-click menu and status-bar URL.
+///
+/// The visible text keeps the amber accent and carries a permanent underline so
+/// it reads as a link — on web the DOM anchor sits on top and swallows hover, so
+/// the affordance cannot depend on a hover state.
+class _Link extends StatelessWidget {
+  const _Link({required this.label, required this.url, required this.style});
+  final String label;
+  final String url;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    return buildExternalLink(
+      url,
+      Text(
+        label,
+        style: style.copyWith(
+          decoration: TextDecoration.underline,
+          decorationColor: _amber.withValues(alpha: 0.55),
+        ),
+      ),
+    );
+  }
 }
 
 /// The monster picture (reference art, quantised nowhere — this is the landing
