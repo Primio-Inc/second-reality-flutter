@@ -32,6 +32,85 @@
   <title>Second Reality Flutter</title>
   <link rel="manifest" href="manifest.json">
 
+  <!--
+    THE BOOT LOADER. Flutter paints nothing until main.dart.js has downloaded and
+    the engine has run its first frame, and until then the browser shows a blank
+    WHITE page. This overlay fills that gap: it is plain HTML/CSS so it appears
+    the instant the document does, and it uses the landing screen's own palette
+    (start_screen.dart) — the sky gradient (#2A1147 -> #150A2E -> #04050C) and the
+    demo's amber/copper-purple/steel accents — so the wait already looks like the
+    demo. It is removed on Flutter's `flutter-first-frame` event (see the script
+    below), fading out over the real first frame.
+  -->
+  <style>
+    #sr-boot {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(to top, #2A1147 0%, #150A2E 45%, #04050C 100%);
+      opacity: 1;
+      transition: opacity 0.6s ease;
+      overflow: hidden;
+    }
+    #sr-boot.sr-gone {
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* A colourful sound equaliser — the demo's own vocabulary (the commentary
+       panel carries a real spectrum). Each bar reacts on its OWN rhythm — a
+       different peak height, cycle length and phase — so it dances like a
+       spectrum analyser reacting to music, not a synchronised wave. The fill is
+       a copper-bar gradient from amber up through purple. */
+    #sr-boot .sr-eq {
+      display: flex;
+      align-items: flex-end;
+      gap: 5px;
+      height: 90px;
+    }
+    #sr-boot .sr-eq span {
+      display: block;
+      width: 8px;
+      height: 8px;
+      border-radius: 3px;
+      transform-origin: bottom;
+      background: linear-gradient(to top, #FFAE1A 0%, #FF6B9D 50%, #7B5CFF 100%);
+      box-shadow: 0 0 12px rgba(123, 92, 255, 0.5);
+      animation-name: sr-eq;
+      animation-iteration-count: infinite;
+      animation-timing-function: ease-in-out;
+    }
+    /* Scale a short bar up to full height — cheaper to animate than `height`
+       (transform is composited, no layout per frame). Each bar gets its own
+       peak via a CSS variable so the crowd never lines up. */
+    @keyframes sr-eq {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(var(--pk, 6)); }
+    }
+    /* 15 bars, each a distinct (peak, duration, delay) triple. The values are
+       arbitrary but fixed — an organic-looking spread that reads as audio. */
+    #sr-boot .sr-eq span:nth-child(1)  { --pk: 4.5; animation-duration: .82s; animation-delay: -.10s; }
+    #sr-boot .sr-eq span:nth-child(2)  { --pk: 7.5; animation-duration: .64s; animation-delay: -.42s; }
+    #sr-boot .sr-eq span:nth-child(3)  { --pk: 5.5; animation-duration: .91s; animation-delay: -.20s; }
+    #sr-boot .sr-eq span:nth-child(4)  { --pk: 9.5; animation-duration: .55s; animation-delay: -.66s; }
+    #sr-boot .sr-eq span:nth-child(5)  { --pk: 6.5; animation-duration: .73s; animation-delay: -.05s; }
+    #sr-boot .sr-eq span:nth-child(6)  { --pk: 10.5; animation-duration: .60s; animation-delay: -.33s; }
+    #sr-boot .sr-eq span:nth-child(7)  { --pk: 5.0; animation-duration: .88s; animation-delay: -.51s; }
+    #sr-boot .sr-eq span:nth-child(8)  { --pk: 8.5; animation-duration: .50s; animation-delay: -.12s; }
+    #sr-boot .sr-eq span:nth-child(9)  { --pk: 6.0; animation-duration: .78s; animation-delay: -.60s; }
+    #sr-boot .sr-eq span:nth-child(10) { --pk: 9.0; animation-duration: .58s; animation-delay: -.27s; }
+    #sr-boot .sr-eq span:nth-child(11) { --pk: 4.5; animation-duration: .85s; animation-delay: -.44s; }
+    #sr-boot .sr-eq span:nth-child(12) { --pk: 7.0; animation-duration: .67s; animation-delay: -.08s; }
+    #sr-boot .sr-eq span:nth-child(13) { --pk: 5.5; animation-duration: .93s; animation-delay: -.55s; }
+    #sr-boot .sr-eq span:nth-child(14) { --pk: 8.0; animation-duration: .62s; animation-delay: -.24s; }
+    #sr-boot .sr-eq span:nth-child(15) { --pk: 6.0; animation-duration: .80s; animation-delay: -.38s; }
+    @media (prefers-reduced-motion: reduce) {
+      #sr-boot .sr-eq span { animation: none; transform: scaleY(4); }
+    }
+  </style>
+
   <script>
     // PURGE ANY SERVICE WORKER. We build with --pwa-strategy=none, so nothing
     // registers one now — but a worker registered by an EARLIER build keeps
@@ -57,6 +136,42 @@
   </script>
 </head>
 <body>
+  <!-- The boot loader, shown until Flutter renders its first frame. -->
+  <div id="sr-boot">
+    <div class="sr-eq">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <script>
+    // Remove the boot loader once Flutter has painted its first frame. The engine
+    // dispatches `flutter-first-frame` on the document; if it already fired (fast
+    // boot), the listener simply never triggers, so also poll for flt-glass-pane
+    // as a fallback. Fade out via the CSS transition, then drop the node.
+    (function () {
+      var removed = false;
+      function hideBoot() {
+        if (removed) return;
+        removed = true;
+        var el = document.getElementById('sr-boot');
+        if (!el) return;
+        el.classList.add('sr-gone');
+        el.addEventListener('transitionend', function () { el.remove(); });
+        // Safety net in case transitionend never fires.
+        setTimeout(function () { if (el.parentNode) el.remove(); }, 900);
+      }
+      window.addEventListener('flutter-first-frame', hideBoot);
+      var poll = setInterval(function () {
+        if (document.querySelector('flt-glass-pane')) {
+          clearInterval(poll);
+          hideBoot();
+        }
+      }, 100);
+    })();
+  </script>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
