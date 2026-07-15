@@ -7,6 +7,8 @@ It is a port, not an emulation: every scene runs the original's own code and
 data. And it is an upgrade: modern high-resolution rendering, AI-regenerated artwork,
 and a 48 kHz soundtrack in place of the period 8-bit mix.
 
+**▶ Run it in your browser: https://primio.dev/demo/second-reality-flutter/**
+
 - Original source (public domain, Unlicense): https://github.com/mtuomi/SecondReality
 - Architecture reference: Fabien Sanglard's code review — https://fabiensanglard.net/second_reality/
 
