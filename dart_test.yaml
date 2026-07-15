@@ -1,0 +1,7 @@
+# The `dump` tag marks visual-check harnesses (they render parts to PNGs under
+# build/frames/ for comparison against reference/frames/, they assert nothing).
+# Keep them out of the normal suite; run them on demand with:
+#   flutter test --run-skipped --tags dump
+tags:
+  dump:
+    skip: "visual-check harness — run with: flutter test --run-skipped --tags dump"

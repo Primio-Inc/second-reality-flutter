@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The LENS picture's own background, so the head's black border and the
+         adaptive icon's background layer meet invisibly. -->
+    <color name="ic_launcher_background">#000000</color>
+</resources>
