@@ -57,3 +57,14 @@ original/MAIN/MUSIC0.S3M.wav
 # assets/music/soundtrack.ogg is now rendered from reference/music/*.s3m by
 # tool/render_soundtrack.py — regenerate rather than commit this 12MB backup.
 reference/music/soundtrack_mastered.ogg
+
+# Play Store upload signing secrets. NEVER commit. Losing these means this app
+# can never be updated on Play again — back them up outside this repo.
+/secrets/
+*.jks
+*.keystore
+key.properties
+
+# Play Store listing copy, feature graphic, screenshots and the scripts that
+# generate them. Untracked by request — nothing here is backed up by git.
+/store-assets/
