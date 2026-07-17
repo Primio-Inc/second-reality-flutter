@@ -12,10 +12,14 @@ import 'engine/audio_clock_io.dart'
 import 'engine/commentary_panel.dart';
 import 'engine/demo_timeline.dart';
 import 'engine/demo_view.dart';
+import 'engine/tv.dart';
 import 'start_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Resolved before the first frame: the landing screen reads isAndroidTv while
+  // building, and a TV drops the outbound link (TV-WB). One platform call.
+  await initTvDetection();
   // On a phone or tablet the demo is landscape-only: the whole thing renders
   // into a 4:3 landscape field (VGA 320x200 on a 4:3 CRT), so a portrait window
   // would letterbox it into a strip. Android's manifest already pins the

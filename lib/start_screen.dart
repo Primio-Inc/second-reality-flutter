@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'engine/external_link.dart';
+import 'engine/tv.dart';
 
 
 /// The landing screen.
@@ -197,6 +198,19 @@ class _StartScreenState extends State<StartScreen>
                   text: 'Second Reality is widely considered the greatest and '
                       'most influential demo in the history of the demoscene. '),
             const TextSpan(text: 'Thirty-three years on, the people behind '),
+            // ON A TV IT IS NOT A LINK. Play's TV bar (TV-WB) says a TV app must
+            // not attempt to launch a browser, and most TVs have none to launch,
+            // so the tap would dead-end or throw — on the one screen a reviewer
+            // cannot miss. It stays amber for the sentence's rhythm but loses
+            // the underline, because underlining something that does nothing is
+            // a worse lie than not linking at all. It is also not focusable, so
+            // the D-pad walks straight past it to START.
+            if (isAndroidTv)
+              const TextSpan(
+                text: 'primio.dev',
+                style: TextStyle(color: _amber),
+              )
+            else
             // A real link, opening primio.dev in a new tab. It CANNOT be a
             // TapGestureRecognizer on a TextSpan: this paragraph lives inside a
             // SelectionArea, whose selection gestures win the arena, so the
