@@ -82,6 +82,7 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     keepScreenAwake(false); // give the screen back
+    _demoFocusNode.dispose();
     super.dispose();
   }
 
@@ -262,14 +263,14 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
       return KeyEventResult.ignored;
     }
 
-    // A D-PAD HAS NOTHING BUT ARROWS. This handler sits above the whole app, so
-    // it also sees keys that bubble up from a focused button — and seeking on
+    // A D-PAD HAS NOTHING BUT ARROWS. This handler is an ancestor key listener,
+    // so it also sees keys that bubble up from a focused button — and acting on
     // left/right there would eat the only navigation an Android TV remote has,
     // trapping focus on whatever it reached. So the demo's own keys apply only
-    // while the demo itself holds focus; once the viewer has D-padded onto a
-    // control, the arrows belong to focus traversal and the centre button to
-    // that control.
-    if (!node.hasPrimaryFocus) return KeyEventResult.ignored;
+    // while the DEMO SURFACE itself holds focus; once the viewer has D-padded
+    // onto a control, the arrows belong to focus traversal and the centre button
+    // to that control.
+    if (!_demoFocusNode.hasPrimaryFocus) return KeyEventResult.ignored;
 
     // The centre of the D-pad, with the demo focused, opens and closes the
     // commentary. It is the one control a viewer gets, and on a remote there is
@@ -278,6 +279,22 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
         e.logicalKey == LogicalKeyboardKey.gameButtonA) {
       setState(() => _commentary = !_commentary);
       return KeyEventResult.handled;
+    }
+
+    // ANDROID TV: the arrows are the remote's ONLY way to navigate, so they must
+    // move FOCUS between the on-screen controls (the commentary panel's options
+    // — close, SMOOTH PIXELS, the equaliser chevron), NOT seek. Returning
+    // ignored lets the event bubble up to Flutter's default DirectionalFocusIntent
+    // shortcuts, which run the focus traversal. Play's TV review requires the
+    // app's options to be reachable with a D-pad; seeking trapped focus on the
+    // demo and made them unreachable. On desktop the arrows still seek — there is
+    // a keyboard (Tab) for traversal and a mouse for the controls.
+    if (isAndroidTv &&
+        (e.logicalKey == LogicalKeyboardKey.arrowLeft ||
+            e.logicalKey == LogicalKeyboardKey.arrowRight ||
+            e.logicalKey == LogicalKeyboardKey.arrowUp ||
+            e.logicalKey == LogicalKeyboardKey.arrowDown)) {
+      return KeyEventResult.ignored;
     }
 
     if (e.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -318,12 +335,30 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Focus(
-        autofocus: true,
+        // A key listener for the demo's DESKTOP keyboard shortcuts only — it
+        // must NEVER hold focus itself. As an autofocusing focus stop it STOLE
+        // focus from the landing screen's START button (confirmed: primaryFocus
+        // landed on THIS node, not the FocusableActionDetector), so a TV
+        // remote's centre press reached this handler — which ignores everything
+        // until the demo has started — instead of activating START. The app
+        // could not be started with a D-pad at all, which is exactly what Play's
+        // TV review flagged. canRequestFocus:false makes it a pure ANCESTOR key
+        // listener: START (landing) and the demo surface (running) own the
+        // focus, and their key events still bubble up through here for the
+        // desktop shortcuts.
+        canRequestFocus: false,
         onKeyEvent: _onKey,
         child: _timeline == null ? _startScreen() : _demo(),
       ),
     );
   }
+
+  /// The demo surface's own focus node. It is what holds focus while the demo
+  /// is running (autofocused when the demo starts), so the demo's own keys apply
+  /// only while IT is focused — once the viewer has D-padded onto a panel
+  /// control, that control owns the input. On a TV this node is also the anchor
+  /// the D-pad traverses OUT of, into the commentary panel's controls.
+  final FocusNode _demoFocusNode = FocusNode(debugLabel: 'demoSurface');
 
   bool _showMenu = false;
   // The (i) documentary track, OPEN by default. The demo is 16 minutes of
@@ -341,14 +376,21 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
     // (it never wraps to a band under the demo), so the demo is simply inset by
     // the panel's own width. The demo is a pure function of the clock, so losing
     // width costs it frames of nothing: it just renders smaller.
-    final demo = DemoView(
-        key: _demoKey,
-        timeline: _timeline!,
-        clock: _clock!,
-        debugOverlay: _debug,
-        framed: _framed,
-        smooth: _smooth,
-        onFinished: _onDemoFinished);
+    // The demo surface is a focus stop, autofocused when the demo starts, so
+    // there is always a "home" for the D-pad and a rect the remote can traverse
+    // OUT of into the panel's controls. Its node is what _onKey gates on.
+    final demo = Focus(
+      focusNode: _demoFocusNode,
+      autofocus: true,
+      child: DemoView(
+          key: _demoKey,
+          timeline: _timeline!,
+          clock: _clock!,
+          debugOverlay: _debug,
+          framed: _framed,
+          smooth: _smooth,
+          onFinished: _onDemoFinished),
+    );
 
     return Stack(
       children: [
