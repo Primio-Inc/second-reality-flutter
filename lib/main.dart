@@ -13,6 +13,7 @@ import 'engine/commentary_panel.dart';
 import 'engine/demo_timeline.dart';
 import 'engine/demo_view.dart';
 import 'engine/tv.dart';
+import 'paused_overlay.dart';
 import 'start_screen.dart';
 
 Future<void> main() async {
@@ -95,7 +96,7 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
   void _keepScreenAwake(bool on) => keepScreenAwake(on);
 
   /// True while the demo is frozen because the app was backgrounded. The user
-  /// has to tap to come back — see [_pausedOverlay].
+  /// has to resume it explicitly (tap, or OK on a remote) — see [PausedOverlay].
   bool _paused = false;
 
   /// MOBILE ONLY. On web, `inactive` fires for things as trivial as the window
@@ -137,7 +138,13 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
   Future<void> _resumeDemo() async {
     await _clock?.resume();
     _keepScreenAwake(true);
-    if (mounted) setState(() => _paused = false);
+    if (!mounted) return;
+    setState(() => _paused = false);
+    // The overlay held focus and the demo was ExcludeFocus'd behind it, so
+    // nothing owns focus now. Hand it back to the demo surface once the frame
+    // has made it focusable again, or a TV remote is dead after resuming.
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _demoFocusNode.requestFocus());
   }
 
   /// Load the assets and decode the soundtrack, then start.
@@ -394,6 +401,26 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
 
     return Stack(
       children: [
+        // While paused, NOTHING behind the overlay may take focus: a Stack layer
+        // does not trap focus the way a dialog route does, and the remote would
+        // otherwise reach the demo surface and the panel's controls under it.
+        Positioned.fill(
+          child: ExcludeFocus(
+            excluding: _paused,
+            child: _demoLayers(demo),
+          ),
+        ),
+        if (_paused)
+          Positioned.fill(
+            child: PausedOverlay(onResume: _resumeDemo, remote: isAndroidTv),
+          ),
+      ],
+    );
+  }
+
+  Widget _demoLayers(Widget demo) {
+    return Stack(
+      children: [
         if (!_commentary)
           demo
         else
@@ -438,49 +465,9 @@ class _DemoScreenState extends State<DemoScreen> with WidgetsBindingObserver {
           ),
         if (_debug && _showMenu)
           Positioned(top: 52, right: 8, child: _sceneMenu()),
-        if (_paused) _pausedOverlay(),
       ],
     );
   }
-
-  /// Shown when the app comes back from the background. The demo is frozen at
-  /// the exact music position it left off at; tapping starts the audio and the
-  /// clock together.
-  Widget _pausedOverlay() => Positioned.fill(
-        child: GestureDetector(
-          onTap: _resumeDemo,
-          child: ColoredBox(
-            color: const Color(0xCC04050C),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.play_arrow_rounded,
-                      color: Color(0xFFFFAE1A), size: 56),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'PAUSED',
-                    style: TextStyle(
-                      color: Color(0xFFFFAE1A),
-                      fontFamily: 'monospace',
-                      fontSize: 14,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'tap to resume',
-                    style: TextStyle(
-                      color: const Color(0xFFDDDDE6).withValues(alpha: 0.75),
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
 
   Widget _sceneMenu() {
     final entries = _timeline!.entries;
